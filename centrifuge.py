@@ -75,12 +75,13 @@ def subdirs_are_discs(subdirs: List[str]) -> bool:
     return True
 
 
-def validate_folder_name(release: Release, violations: List[str], folder_name: str, skip_comparison: bool) -> None:
+def validate_folder_name(release: Release, violations: List[str], folder_name: str, skip_comparison: bool,
+                         group_by_category: bool = False) -> None:
     if not release.can_validate_folder_name():
         violations.append("Cannot validate folder name")
         return
 
-    valid_folder_name = release.get_folder_name()
+    valid_folder_name = release.get_folder_name(group_by_category=group_by_category)
     if valid_folder_name != folder_name and not skip_comparison:
         violations.append("Invalid folder name - should be '{valid_folder_name}'"
                           .format(valid_folder_name=valid_folder_name))
@@ -228,7 +229,7 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
 
         # calculate violations before and after fixing
         old_violations = validator.validate(release)
-        validate_folder_name(release, old_violations, os.path.split(curr_dir)[1], False)
+        validate_folder_name(release, old_violations, os.path.split(curr_dir)[1], False, args.group_by_category)
         violations = validator.validate(fixed)
         validate_folder_name(fixed, violations, os.path.split(curr_dir)[1], True)
 
@@ -251,7 +252,8 @@ def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, args: 
     moved_dir = curr_dir
 
     # rename the release folder
-    fixed_dir = os.path.join(os.path.split(curr_dir)[0], release.get_folder_name())
+    fixed_dir = os.path.join(os.path.split(curr_dir)[0],
+                             release.get_folder_name(group_by_category=args.group_by_category))
     if curr_dir != fixed_dir:
         if not os.path.exists(fixed_dir) or os.path.normcase(curr_dir) == os.path.normcase(fixed_dir):
             os.rename(curr_dir, fixed_dir)
@@ -266,7 +268,8 @@ def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, args: 
 
         category_folder = str(release.category.value) if args.group_by_category else ""
         curr_dest_parent_folder = os.path.join(dest_folder, category_folder, artist_folder)
-        curr_dest_folder = os.path.join(curr_dest_parent_folder, release.get_folder_name())
+        curr_dest_folder = os.path.join(curr_dest_parent_folder,
+                                        release.get_folder_name(group_by_category=args.group_by_category))
 
         if not os.path.exists(curr_dest_parent_folder):
             os.makedirs(curr_dest_parent_folder, exist_ok=True)
