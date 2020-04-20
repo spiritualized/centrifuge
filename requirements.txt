@@ -1,0 +1,8 @@
+bitstring==3.1.6
+cleartag>=1.0.0
+colored==1.4.2
+configparser>=5.0.0
+lastfmcache>=1.1.0
+metafix>=1.0.1
+mutagen==1.44.0
+ordered-set==3.1.1
