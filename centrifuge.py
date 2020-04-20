@@ -271,18 +271,19 @@ def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, args: 
         curr_dest_folder = os.path.join(curr_dest_parent_folder,
                                         release.get_folder_name(group_by_category=args.group_by_category))
 
-        if not os.path.exists(curr_dest_parent_folder):
-            os.makedirs(curr_dest_parent_folder, exist_ok=True)
-        if not os.path.exists(curr_dest_folder):
-            os.rename(fixed_dir, curr_dest_folder)
+        if fixed_dir != curr_dest_folder:
+            if not os.path.exists(curr_dest_parent_folder):
+                os.makedirs(curr_dest_parent_folder, exist_ok=True)
+            if not os.path.exists(curr_dest_folder):
+                os.rename(fixed_dir, curr_dest_folder)
 
-            # clean up empty directories
-            curr_src_parent_folder = os.path.split(fixed_dir)[0]
-            while not os.listdir(curr_src_parent_folder):
-                os.rmdir(curr_src_parent_folder)
-                curr_src_parent_folder = os.path.split(curr_src_parent_folder)[0]
-        else:
-            logging.getLogger(__name__).error("Destination folder already exists: {0}".format(fixed_dir))
+                # clean up empty directories
+                curr_src_parent_folder = os.path.split(fixed_dir)[0]
+                while not os.listdir(curr_src_parent_folder):
+                    os.rmdir(curr_src_parent_folder)
+                    curr_src_parent_folder = os.path.split(curr_src_parent_folder)[0]
+            else:
+                logging.getLogger(__name__).error("Destination folder already exists: {0}".format(fixed_dir))
 
     return moved_dir
 
