@@ -87,7 +87,7 @@ def rename_files(release: Release, parent_path: str, dry_run=False) -> None:
             os.rename(os.path.join(parent_path, rename[0]), dest_path)
 
             # clean up empty directories
-            curr_parent_path = parent_path
+            curr_parent_path = os.path.join(parent_path, os.path.split(rename[0])[0])
             while not os.listdir(curr_parent_path):
                 os.rmdir(curr_parent_path)
                 curr_parent_path = os.path.split(curr_parent_path)[0]
@@ -103,6 +103,7 @@ def can_lock_path(path: str) -> bool:
         except PermissionError:
             return False
     return True
+
 
 def color(str_in: str, color: str) -> str:
     return "{0}{1}{2}".format(color, str_in, colored.attr('reset'))
