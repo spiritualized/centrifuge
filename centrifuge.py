@@ -63,6 +63,10 @@ def has_media_files(files: List[str]) -> bool:
 
 def subdirs_are_discs(subdirs: List[str]) -> bool:
 
+    # sanity check
+    if len(subdirs) > 20:
+        return False
+
     for curr in subdirs:
         folder_name = curr.split(os.path.sep)[-1]
         if re.findall(r'(disc|disk|cd) ?\d{1,2}', folder_name.lower()):
@@ -146,6 +150,8 @@ def format_violations_str(old_violations: List[str], fixed_violations: Optional[
 def validate_releases(validator: ReleaseValidator, release_dirs: List[str], args: argparse.Namespace) -> None:
     """Validate releases found in the scan directory"""
 
+    assemble_discs(release_dirs, False)
+
     for curr_dir in release_dirs:
         audio, non_audio = load_directory(curr_dir)
         release = Release(audio)
@@ -189,10 +195,59 @@ def guess_category_from_path(path: str) -> Optional[ReleaseCategory]:
     # default to album
     return ReleaseCategory.ALBUM
 
+def assemble_discs(release_dirs: List[str], move_folders: bool) -> None:
+    """
+    Directories which contain non-nested discs belonging to the same release are problematic. Solve this by grouping
+    disc directories via their lowercase prefix, and move them inside a created release directory
+    """
+
+    consolidate = {}
+
+    for curr in release_dirs:
+        parent, folder = os.path.split(curr)
+        match = re.findall(r'(?i)( )?([(\[{ ])?(disc|disk|cd)( ?)(\d{1,2})([)\]}])?', folder)
+
+        if match:
+            container = os.path.join(parent, folder.replace(''.join(match[0]), ""))
+            container = re.sub(r' \[[\w]+\]', '', container)
+
+            # create a map[path.lower() -> [path, set[path1, path2...]]
+            if container.lower() not in consolidate:
+                consolidate[container.lower()] = [container, {folder}]
+            else:
+                consolidate[container.lower()][1].add(folder)
+
+    # only consolidate releases with more than one disc present
+    consolidate = {key: consolidate[key] for key in consolidate if len(consolidate[key][1]) > 1}
+
+    # unpack
+    consolidate = {item[0]: item[1] for item in consolidate.values()}
+
+    # in validate mode, remove the matched folders, thus eliminating them from consideration
+    if not move_folders:
+        for release_path in consolidate:
+            for disc in consolidate[release_path]:
+                release_dirs.remove(os.path.join(os.path.split(release_path)[0], disc))
+
+    # in fix mode, create a parent folder and consolidate
+    else:
+        for release_path in consolidate:
+            # create a container directory, add it to release_dirs
+            os.makedirs(release_path, exist_ok=True)
+            release_dirs.append(release_path)
+
+            # move each disc into the container, and remove from release_dirs
+            for disc in consolidate[release_path]:
+                source = os.path.join(os.path.split(release_path)[0], disc)
+                os.rename(source, os.path.join(release_path, disc))
+                release_dirs.remove(source)
+
 
 def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: argparse.Namespace,
                  dest_folder: str) -> None:
     """Fix releases found in the scan directory"""
+
+    assemble_discs(release_dirs, True)
 
     for curr_dir in release_dirs:
         if not can_lock_path(curr_dir):
