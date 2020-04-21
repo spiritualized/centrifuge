@@ -271,7 +271,7 @@ def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, args: 
         curr_dest_folder = os.path.join(curr_dest_parent_folder,
                                         release.get_folder_name(group_by_category=args.group_by_category))
 
-        if fixed_dir != curr_dest_folder:
+        if os.path.normcase(fixed_dir) != os.path.normcase(curr_dest_folder):
             if not os.path.exists(curr_dest_parent_folder):
                 os.makedirs(curr_dest_parent_folder, exist_ok=True)
             if not os.path.exists(curr_dest_folder):
