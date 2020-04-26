@@ -7,16 +7,18 @@ import sys
 
 import argparse
 from collections import OrderedDict
-from typing import List, Optional
+from typing import List, Optional, Set
 
 import colored
+
 from lastfmcache import LastfmCache
 
 import cleartag
 from functions import load_directory, rename_files, color, can_lock_path
 from metafix.Release import Release
 from metafix.ReleaseValidator import ReleaseValidator
-from metafix.constants import ReleaseCategory
+from metafix.Violation import Violation
+from metafix.constants import ReleaseCategory, ViolationType
 from metafix.functions import has_audio_extension, flatten_artists
 
 
@@ -79,10 +81,10 @@ def subdirs_are_discs(subdirs: List[str]) -> bool:
     return True
 
 
-def validate_folder_name(release: Release, violations: List[str], folder_name: str, skip_comparison: bool,
+def validate_folder_name(release: Release, violations: List[Violation], folder_name: str, skip_comparison: bool,
                          group_by_category: bool = False) -> None:
     if not release.can_validate_folder_name():
-        violations.append("Cannot validate folder name")
+        violations.append(Violation(ViolationType.FOLDER_NAME, "Cannot validate folder name"))
         return
 
     valid_folder_name = release.get_folder_name(group_by_category=group_by_category)
@@ -109,10 +111,13 @@ def parse_args() -> argparse.Namespace:
 
     argparser.add_argument('--only-move-valid', action='store_true', help="only move fully valid releases")
 
+    argparser.add_argument("--move-invalid", help="move releases which fail this validation to a directory")
+    argparser.add_argument("--move-invalid-to", help="destination directory for releases which fail validation")
+
     return argparser.parse_args()
 
 
-def print_list(list_to_print: List[str]) -> None:
+def print_list(list_to_print: List[Violation]) -> None:
     for v in list_to_print:
         print(v)
     if list_to_print:
@@ -128,7 +133,7 @@ def list_releases(release_dirs: List[str]) -> None:
     print("Total: {0}".format(len(release_dirs)))
 
 
-def format_violations_str(old_violations: List[str], fixed_violations: Optional[List[str]] = None) -> str:
+def format_violations_str(old_violations: List[Violation], fixed_violations: Optional[List[Violation]] = None) -> str:
     """Formats a colorized string of validation failures"""
 
     old_violations_str = color(str(len(old_violations)), colored.fg('red_1')) if len(old_violations) \
@@ -244,7 +249,7 @@ def assemble_discs(release_dirs: List[str], move_folders: bool) -> None:
 
 
 def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: argparse.Namespace,
-                 dest_folder: str) -> None:
+                 dest_folder: str, invalid_folder: str) -> None:
     """Fix releases found in the scan directory"""
 
     assemble_discs(release_dirs, True)
@@ -288,13 +293,27 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
         violations = validator.validate(fixed)
         validate_folder_name(fixed, violations, os.path.split(curr_dir)[1], True)
 
-        moved_dir = move_rename_folder(fixed, curr_dir, dest_folder, args)
+        if len(violations) == 0:
+            moved_dir = move_rename_folder(fixed, curr_dir, dest_folder, args)
+        else:
+            moved_dir = move_invalid_folder(curr_dir, invalid_folder, violations, args.move_invalid)
 
         print("{0} violations: {1}".format(format_violations_str(old_violations, violations), moved_dir))
 
         if args.show_violations:
             print_list(old_violations)
             print_list(violations)
+
+
+def move_invalid_folder(curr_dir: str, invalid_folder: str, violations: List[Violation], move_invalid: str) -> str:
+    relocated_dir = curr_dir
+    dest = os.path.join(invalid_folder, os.path.split(curr_dir)[1])
+
+    if not os.path.exists(dest) and move_invalid in [x.violation_type.value for x in violations]:
+        os.rename(curr_dir, dest)
+        relocated_dir = dest
+
+    return relocated_dir
 
 
 def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, args: argparse.Namespace) -> str:
@@ -359,6 +378,18 @@ def main():
         if not os.path.isdir(dest_folder):
             raise ValueError("Invalid destination folder: {0}".format(dest_folder))
 
+    invalid_folder = None
+    if args.move_invalid:
+        if args.move_invalid not in [v.value for v in ViolationType]:
+            raise ValueError("Invalid violation type '{0}', must be one of {1}"
+                             .format(args.move_invalid, ", ".join([v.value for v in ViolationType])))
+        if not args.move_invalid_to:
+            raise ValueError("--move-invalid must be accompanied by --move-invalid-to")
+        invalid_folder = os.path.abspath(args.move_invalid_to)
+        if not os.path.isdir(invalid_folder):
+            raise ValueError("Destination folder for invalid releases does not exist")
+
+
     release_dirs = get_release_dirs(src_folder)
 
     if args.mode == "releases":
@@ -375,7 +406,7 @@ def main():
             validate_releases(validator, release_dirs, args)
 
         elif args.mode == "fix":
-            fix_releases(validator, release_dirs, args, dest_folder)
+            fix_releases(validator, release_dirs, args, dest_folder, invalid_folder)
 
 
 def load_lastfm_config():
