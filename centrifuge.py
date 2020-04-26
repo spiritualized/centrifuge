@@ -89,8 +89,8 @@ def validate_folder_name(release: Release, violations: List[Violation], folder_n
 
     valid_folder_name = release.get_folder_name(group_by_category=group_by_category)
     if valid_folder_name != folder_name and not skip_comparison:
-        violations.append("Invalid folder name - should be '{valid_folder_name}'"
-                          .format(valid_folder_name=valid_folder_name))
+        violations.append(Violation(ViolationType.FOLDER_NAME, "Invalid folder name - should be '{valid_folder_name}'"
+                          .format(valid_folder_name=valid_folder_name)))
 
 
 def parse_args() -> argparse.Namespace:
