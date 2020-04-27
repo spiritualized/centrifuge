@@ -114,6 +114,8 @@ def parse_args() -> argparse.Namespace:
     argparser.add_argument("--move-invalid", help="move releases which fail this validation to a directory")
     argparser.add_argument("--move-invalid-to", help="destination directory for releases which fail validation")
 
+    argparser.add_argument("--move-duplicate-to", help="destination directory for valid releases which already exist")
+
     return argparser.parse_args()
 
 
@@ -249,7 +251,7 @@ def assemble_discs(release_dirs: List[str], move_folders: bool) -> None:
 
 
 def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: argparse.Namespace,
-                 dest_folder: str, invalid_folder: str) -> None:
+                 dest_folder: str, invalid_folder: str, duplicate_folder: str) -> None:
     """Fix releases found in the scan directory"""
 
     assemble_discs(release_dirs, True)
@@ -296,7 +298,7 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
         validate_folder_name(fixed, violations, os.path.split(curr_dir)[1], True)
 
         if len(violations) == 0:
-            moved_dir = move_rename_folder(fixed, curr_dir, dest_folder, args)
+            moved_dir = move_rename_folder(fixed, curr_dir, dest_folder, duplicate_folder, args)
         else:
             moved_dir = move_invalid_folder(curr_dir, invalid_folder, violations, args.move_invalid)
 
@@ -322,7 +324,8 @@ def move_invalid_folder(curr_dir: str, invalid_folder: str, violations: List[Vio
     return relocated_dir
 
 
-def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, args: argparse.Namespace) -> str:
+def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, duplicate_folder: str,
+                       args: argparse.Namespace) -> str:
     """Rename a release folder, and move to a destination folder"""
 
     # if a dry run,or the folder name cannot be validated, do nothing
@@ -363,7 +366,19 @@ def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, args: 
                     os.rmdir(curr_src_parent_folder)
                     curr_src_parent_folder = os.path.split(curr_src_parent_folder)[0]
             else:
-                logging.getLogger(__name__).error("Destination folder already exists: {0}".format(fixed_dir))
+                if duplicate_folder:
+                    attempt = 0
+                    while True:
+                        curr_dest_folder = os.path.join(
+                            duplicate_folder, release.get_folder_name(group_by_category=args.group_by_category))
+                        if attempt:
+                            curr_dest_folder += "_{0}".format(attempt)
+                        if not os.path.exists(curr_dest_folder):
+                            os.rename(fixed_dir, curr_dest_folder)
+                            break
+                        attempt += 1
+                else:
+                    logging.getLogger(__name__).error("Destination folder already exists: {0}".format(fixed_dir))
 
     return moved_dir
 
@@ -395,6 +410,12 @@ def main():
         if not os.path.isdir(invalid_folder):
             raise ValueError("Destination folder for invalid releases does not exist")
 
+    duplicate_folder = None
+    if args.move_duplicate_to:
+        duplicate_folder = os.path.abspath(args.move_duplicate_to)
+        if not os.path.isdir(duplicate_folder):
+            raise ValueError("Invalid duplicates folder: {0}".format(duplicate_folder))
+
     release_dirs = get_release_dirs(src_folder)
 
     if args.mode == "releases":
@@ -411,7 +432,7 @@ def main():
             validate_releases(validator, release_dirs, args)
 
         elif args.mode == "fix":
-            fix_releases(validator, release_dirs, args, dest_folder, invalid_folder)
+            fix_releases(validator, release_dirs, args, dest_folder, invalid_folder, duplicate_folder)
 
 
 def load_lastfm_config():
