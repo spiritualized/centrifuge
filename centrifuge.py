@@ -285,6 +285,8 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
             correct_filename = fixed.tracks[x].get_filename(fixed.is_va())
             if correct_filename:
                 new_tracks[correct_filename] = fixed.tracks[x]
+            else:
+                new_tracks[x] = fixed.tracks[x]
         fixed.tracks = new_tracks
 
         # calculate violations before and after fixing
@@ -306,7 +308,11 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
 
 
 def move_invalid_folder(curr_dir: str, invalid_folder: str, violations: List[Violation], move_invalid: str) -> str:
+    if not invalid_folder:
+        return curr_dir
+
     relocated_dir = curr_dir
+
     dest = os.path.join(invalid_folder, os.path.split(curr_dir)[1])
 
     if not os.path.exists(dest) and move_invalid in [x.violation_type.value for x in violations]:
@@ -388,7 +394,6 @@ def main():
         invalid_folder = os.path.abspath(args.move_invalid_to)
         if not os.path.isdir(invalid_folder):
             raise ValueError("Destination folder for invalid releases does not exist")
-
 
     release_dirs = get_release_dirs(src_folder)
 
