@@ -267,7 +267,7 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
 
         # fixed = None
         # while True:
-        fixed = validator.fix(release)
+        fixed = validator.fix(release, os.path.split(curr_dir)[1])
         # break
         # except pylast.WSError as e:
         #     logging.getLogger(__name__).error("Failed to retrieve {0}".format(release))
