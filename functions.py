@@ -62,7 +62,7 @@ def rename_files(release: Release, parent_path: str, dry_run=False) -> None:
         correct_filename = release.tracks[filename].get_filename(release.is_va())
 
         if not correct_filename:
-            continue
+            return
 
         dest_path = os.path.join(parent_path, correct_filename)
 
