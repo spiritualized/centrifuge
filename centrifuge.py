@@ -422,8 +422,7 @@ def main():
         list_releases(release_dirs)
 
     elif args.mode in ["validate", "fix"]:
-        lastfm_api_key, lastfm_shared_secret = load_lastfm_config()
-        lastfm = LastfmCache(lastfm_api_key, lastfm_shared_secret)
+        lastfm = LastfmCache(lastfmcache_api_url=get_lastfmcache_api_url())
         lastfm.enable_file_cache(86400*365*5)
 
         validator = ReleaseValidator(lastfm)
@@ -434,16 +433,33 @@ def main():
         elif args.mode == "fix":
             fix_releases(validator, release_dirs, args, dest_folder, invalid_folder, duplicate_folder)
 
-
-def load_lastfm_config():
+def get_lastfmcache_api_url() -> str:
     root_dir = os.path.dirname(os.path.abspath(__file__))
-    ini_filename = "lastfm.ini"
+    ini_filename = "config.ini"
 
     if not os.path.isfile(os.path.join(root_dir, ini_filename)):
         shutil.copy(os.path.join(root_dir, "ini_template"), os.path.join(root_dir, ini_filename))
 
     config = configparser.ConfigParser()
-    config.read(os.path.join(root_dir, "lastfm.ini"))
+    config.read(os.path.join(root_dir, ini_filename))
+
+    if 'lastfmcache' not in config:
+        raise ValueError("Invalid {0} config file".format(ini_filename))
+    if not config['lastfmcache'].get('api_url'):
+        logging.getLogger(__name__).error("lastfmcache API URL missing from {0}".format(ini_filename))
+        exit(1)
+
+    return config['lastfmcache']['api_url']
+
+def load_config():
+    root_dir = os.path.dirname(os.path.abspath(__file__))
+    ini_filename = "config.ini"
+
+    if not os.path.isfile(os.path.join(root_dir, ini_filename)):
+        shutil.copy(os.path.join(root_dir, "ini_template"), os.path.join(root_dir, ini_filename))
+
+    config = configparser.ConfigParser()
+    config.read(os.path.join(root_dir, ini_filename))
 
     if 'lastfm' not in config:
         raise ValueError("Invalid {0} config file".format(ini_filename))
