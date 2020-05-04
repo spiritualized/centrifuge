@@ -1,3 +1,6 @@
+[lastfmcache]
+api_url = https://spiritualized.io/lastfmcache/api
+
 [lastfm]
 api_key = 
 shared_secret = 

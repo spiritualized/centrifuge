@@ -101,7 +101,7 @@ ENV/
 .idea/
 
 # project specific
-lastfm.ini
+config.ini
 cache.db
 cleartag
 metafix
