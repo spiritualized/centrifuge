@@ -6,6 +6,7 @@ import shutil
 import sys
 
 import argparse
+import time
 from collections import OrderedDict
 from typing import List, Optional, Set
 
@@ -82,12 +83,12 @@ def subdirs_are_discs(subdirs: List[str]) -> bool:
 
 
 def validate_folder_name(release: Release, violations: List[Violation], folder_name: str, skip_comparison: bool,
-                         group_by_category: bool = False) -> None:
+                         group_by_category: bool = False, codec_short: bool = True) -> None:
     if not release.can_validate_folder_name():
         violations.append(Violation(ViolationType.FOLDER_NAME, "Cannot validate folder name"))
         return
 
-    valid_folder_name = release.get_folder_name(group_by_category=group_by_category)
+    valid_folder_name = release.get_folder_name(group_by_category=group_by_category, codec_short=codec_short)
     if valid_folder_name != folder_name and not skip_comparison:
         violations.append(Violation(ViolationType.FOLDER_NAME, "Invalid folder name - should be '{valid_folder_name}'"
                           .format(valid_folder_name=valid_folder_name)))
@@ -102,6 +103,8 @@ def parse_args() -> argparse.Namespace:
     argparser.add_argument('--dry-run', action='store_true', help="run without editing or moving any files")
     argparser.add_argument('--group-by-artist', action='store_true', help="group releases into artist folders")
     argparser.add_argument('--group-by-category', action='store_true', help="group releases into category folders")
+    argparser.add_argument('--full-codec-names', action='store_true',
+                           help="always include the codec in the release folder name")
 
     argparser_move = argparser.add_mutually_exclusive_group()
 
@@ -163,8 +166,9 @@ def validate_releases(validator: ReleaseValidator, release_dirs: List[str], args
         audio, non_audio = load_directory(curr_dir)
         release = Release(audio)
 
+        codec_short = not args.full_codec_names
         violations = validator.validate(release)
-        validate_folder_name(release, violations, os.path.split(curr_dir)[1], False)
+        validate_folder_name(release, violations, os.path.split(curr_dir)[1], False, codec_short)
 
         print("{0} violations: {1}".format(format_violations_str(violations), curr_dir))
 
@@ -212,7 +216,7 @@ def assemble_discs(release_dirs: List[str], move_folders: bool) -> None:
 
     for curr in release_dirs:
         parent, folder = os.path.split(curr)
-        match = re.findall(r'(?i)( )?([(\[{ ])?(disc|disk|cd)( ?)(\d{1,2})([)\]}])?', folder)
+        match = re.findall(r'(?i)( )?([(\[{ ])?(disc|disk|cd|part)( ?)(\d{1,2})([)\]}])?', folder)
 
         if match:
             container = os.path.join(parent, folder.replace(''.join(match[0]), ""))
@@ -292,10 +296,12 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
         fixed.tracks = new_tracks
 
         # calculate violations before and after fixing
+        codec_short = not args.full_codec_names
         old_violations = validator.validate(release)
-        validate_folder_name(release, old_violations, os.path.split(curr_dir)[1], False, args.group_by_category)
+        validate_folder_name(release, old_violations, os.path.split(curr_dir)[1], False, args.group_by_category,
+                             codec_short)
         violations = validator.validate(fixed)
-        validate_folder_name(fixed, violations, os.path.split(curr_dir)[1], True)
+        validate_folder_name(fixed, violations, os.path.split(curr_dir)[1], True, args.group_by_category, codec_short)
 
         if len(violations) == 0:
             moved_dir = move_rename_folder(fixed, curr_dir, dest_folder, duplicate_folder, args)
@@ -305,8 +311,13 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
         print("{0} violations: {1}".format(format_violations_str(old_violations, violations), moved_dir))
 
         if args.show_violations:
-            print_list(old_violations)
-            print_list(violations)
+            if old_violations:
+                print("Before")
+                print_list(old_violations)
+
+            if violations:
+                print("After:")
+                print_list(violations)
 
 
 def move_invalid_folder(curr_dir: str, invalid_folder: str, violations: List[Violation], move_invalid: str) -> str:
@@ -335,11 +346,20 @@ def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, duplic
     moved_dir = curr_dir
 
     # rename the release folder
+    codec_short = not args.full_codec_names
     fixed_dir = os.path.join(os.path.split(curr_dir)[0],
-                             release.get_folder_name(group_by_category=args.group_by_category))
+                             release.get_folder_name(codec_short=codec_short, group_by_category=args.group_by_category))
     if curr_dir != fixed_dir:
         if not os.path.exists(fixed_dir) or os.path.normcase(curr_dir) == os.path.normcase(fixed_dir):
-            os.rename(curr_dir, fixed_dir)
+            while True:
+                try:
+                    os.rename(curr_dir, fixed_dir)
+                    break
+                except PermissionError:
+                    logging.getLogger(__name__).error("PermissionError: could not rename directory to {0}"
+                                                      .format(fixed_dir))
+                    time.sleep(1)
+
             moved_dir = fixed_dir
         else:
             logging.getLogger(__name__).error("Release folder already exists: {0}".format(fixed_dir))
@@ -352,7 +372,8 @@ def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, duplic
         category_folder = str(release.category.value) if args.group_by_category else ""
         curr_dest_parent_folder = os.path.join(dest_folder, category_folder, artist_folder)
         curr_dest_folder = os.path.join(curr_dest_parent_folder,
-                                        release.get_folder_name(group_by_category=args.group_by_category))
+                                        release.get_folder_name(codec_short=codec_short,
+                                                                group_by_category=args.group_by_category))
 
         if os.path.normcase(fixed_dir) != os.path.normcase(curr_dest_folder):
             if not os.path.exists(curr_dest_parent_folder):
@@ -370,7 +391,8 @@ def move_rename_folder(release: Release, curr_dir: str, dest_folder: str, duplic
                     attempt = 0
                     while True:
                         curr_dest_folder = os.path.join(
-                            duplicate_folder, release.get_folder_name(group_by_category=args.group_by_category))
+                            duplicate_folder, release.get_folder_name(codec_short=codec_short,
+                                                                      group_by_category=args.group_by_category))
                         if attempt:
                             curr_dest_folder += "_{0}".format(attempt)
                         if not os.path.exists(curr_dest_folder):
