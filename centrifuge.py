@@ -93,6 +93,10 @@ def validate_folder_name(release: Release, violations: List[Violation], folder_n
         violations.append(Violation(ViolationType.FOLDER_NAME, "Invalid folder name - should be '{valid_folder_name}'"
                           .format(valid_folder_name=valid_folder_name)))
 
+def add_unreadable_files(violations: List[Violation], unreadable: List[str]):
+    for file in unreadable:
+        violations.append(Violation(ViolationType.UNREADABLE, "Unreadable file: {0}".format(file)))
+
 
 def parse_args() -> argparse.Namespace:
     argparser = argparse.ArgumentParser()
@@ -163,12 +167,13 @@ def validate_releases(validator: ReleaseValidator, release_dirs: List[str], args
     assemble_discs(release_dirs, False)
 
     for curr_dir in release_dirs:
-        audio, non_audio = load_directory(curr_dir)
+        audio, non_audio, unreadable = load_directory(curr_dir)
         release = Release(audio)
 
         codec_short = not args.full_codec_names
         violations = validator.validate(release)
         validate_folder_name(release, violations, os.path.split(curr_dir)[1], False, codec_short)
+        add_unreadable_files(violations, unreadable)
 
         print("{0} violations: {1}".format(format_violations_str(violations), curr_dir))
 
@@ -265,7 +270,7 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
             logging.getLogger(__name__).error("Could not lock directory {0}".format(curr_dir))
             continue
 
-        audio, non_audio = load_directory(curr_dir)
+        audio, non_audio, unreadable = load_directory(curr_dir)
 
         release = Release(audio, guess_category_from_path(curr_dir))
 
@@ -300,8 +305,11 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
         old_violations = validator.validate(release)
         validate_folder_name(release, old_violations, os.path.split(curr_dir)[1], False, args.group_by_category,
                              codec_short)
+        add_unreadable_files(old_violations, unreadable)
+
         violations = validator.validate(fixed)
         validate_folder_name(fixed, violations, os.path.split(curr_dir)[1], True, args.group_by_category, codec_short)
+        add_unreadable_files(violations, unreadable)
 
         if len(violations) == 0:
             moved_dir = move_rename_folder(fixed, curr_dir, dest_folder, duplicate_folder, args)
