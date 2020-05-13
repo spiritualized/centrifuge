@@ -21,6 +21,7 @@ def load_directory(path_param: str):
         raise InvalidPathError("Not a folder: {0}".format(path))
 
     non_audio = []
+    unreadable = []
     audio = OrderedDict()
 
     for file in list_files(path_param):
@@ -30,11 +31,11 @@ def load_directory(path_param: str):
                 audio[file].__class__ = Track
             except ClearTagError as e:
                 logging.getLogger(__name__).error(e)
-                non_audio.append(file)
+                unreadable.append(file)
         else:
             non_audio.append(file)
 
-    return audio, non_audio
+    return audio, non_audio, unreadable
 
 
 def list_files(parent_dir: str) -> List[str]:
