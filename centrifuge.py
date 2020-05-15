@@ -23,19 +23,21 @@ from metafix.constants import ReleaseCategory, ViolationType
 from metafix.functions import has_audio_extension, flatten_artists
 
 class UniqueRelease:
-    def __init__(self, artists: List[str], year: str, title: str):
+    def __init__(self, artists: List[str], year: str, title: str, codec: str):
         self.artists = artists
         self.year = year
         self.title = title
+        self.codec = codec
 
     def __eq__(self, other):
         if not isinstance(other, UniqueRelease):
             return False
 
-        return self.artists == other.artists and self.year == other.year and self.title == other.title
+        return self.artists == other.artists and self.year == other.year and self.title == other.title \
+               and self.codec == other.codec
 
     def __hash__(self):
-        return hash((tuple(self.artists), self.year, self.title))
+        return hash((tuple(self.artists), self.year, self.title, self.codec))
 
 
 def get_release_dirs(src_folder: str) -> List[str]:
@@ -105,8 +107,9 @@ def validate_folder_name(release: Release, violations: List[Violation], folder_n
 
     valid_folder_name = release.get_folder_name(group_by_category=group_by_category, codec_short=codec_short)
     if valid_folder_name != folder_name and not skip_comparison:
-        violations.append(Violation(ViolationType.FOLDER_NAME, "Invalid folder name - should be '{valid_folder_name}'"
-                          .format(valid_folder_name=valid_folder_name)))
+        violations.append(Violation(ViolationType.FOLDER_NAME,
+                                    "Invalid folder name '{folder_name}' should be '{valid_folder_name}'"
+                                    .format(folder_name=folder_name, valid_folder_name=valid_folder_name)))
 
 def add_unreadable_files(violations: List[Violation], unreadable: List[str]):
     for file in unreadable:
@@ -383,7 +386,7 @@ def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr
             logging.getLogger(__name__).error("Release folder already exists: {0}".format(fixed_dir))
 
     release_tuple = UniqueRelease(release.validate_release_artists(), release.validate_release_date().split("-")[0],
-                    release.validate_release_title())
+                    release.validate_release_title(), release.validate_codec())
 
     # move the release folder to a destination
     if dest_folder and (release.num_violations == 0 or args.only_move_valid is False):
@@ -419,7 +422,7 @@ def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr
     # deduplicate versions of the same release
     if duplicate_folder and (release.num_violations == 0 or args.only_move_valid is False):
         if release_tuple in unique_releases:
-            existing = unique_releases[release_tuple]
+            existing = unique_releases[release_tuple][0]
 
         else:
             unique_releases[release_tuple] = (release.get_release_codec_setting(), moved_dir)
