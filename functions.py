@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from collections import OrderedDict
 from typing import List
 
@@ -85,7 +86,14 @@ def rename_files(release: Release, parent_path: str, dry_run=False) -> None:
                 logging.getLogger(__name__).error("File already exists, could not rename: {0}".format(dest_path))
                 continue
 
-            os.rename(os.path.join(parent_path, rename[0]), dest_path)
+            while True:
+                try:
+                    os.rename(os.path.join(parent_path, rename[0]), dest_path)
+                    break
+                except PermissionError:
+                    logging.getLogger(__name__).error("PermissionError: could not rename '{0}' -> '{1}', retrying..."
+                                                      .format(os.path.join(parent_path, rename[0]), dest_path))
+                    time.sleep(1)
 
             # clean up empty directories
             curr_parent_path = os.path.join(parent_path, os.path.split(rename[0])[0])
