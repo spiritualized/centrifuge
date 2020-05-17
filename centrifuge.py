@@ -134,8 +134,6 @@ def parse_args() -> argparse.Namespace:
                                 help="move validated releases into the root scan directory")
     argparser_move.add_argument("--move-fixed-to", help="move validated releases to another folder")
 
-    argparser.add_argument('--only-move-valid', action='store_true', help="only move fully valid releases")
-
     argparser.add_argument("--move-invalid", help="move releases which fail this validation to a directory")
     argparser.add_argument("--move-invalid-to", help="destination directory for releases which fail validation")
 
@@ -389,7 +387,7 @@ def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr
                     release.validate_release_title(), release.validate_codec())
 
     # move the release folder to a destination
-    if dest_folder and (release.num_violations == 0 or args.only_move_valid is False):
+    if dest_folder and release.num_violations == 0:
         artist_folder = flatten_artists(release.validate_release_artists()) \
             if args.group_by_artist and not release.is_va() else ""
 
@@ -420,7 +418,7 @@ def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr
                     logging.getLogger(__name__).error("Destination folder already exists: {0}".format(fixed_dir))
 
     # deduplicate versions of the same release
-    if duplicate_folder and (release.num_violations == 0 or args.only_move_valid is False):
+    if duplicate_folder and release.num_violations == 0:
         if release_tuple in unique_releases:
             existing = unique_releases[release_tuple][0]
 
