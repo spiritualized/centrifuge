@@ -22,6 +22,7 @@ from metafix.Violation import Violation
 from metafix.constants import ReleaseCategory, ViolationType
 from metafix.functions import has_audio_extension, flatten_artists
 
+
 class UniqueRelease:
     def __init__(self, artists: List[str], year: str, title: str, codec: str):
         self.artists = artists
@@ -89,7 +90,7 @@ def subdirs_are_discs(subdirs: List[str]) -> bool:
 
     for curr in subdirs:
         folder_name = curr.split(os.path.sep)[-1]
-        if re.findall(r'(disc|disk|cd) ?\d{1,2}', folder_name.lower()):
+        if re.findall(r'(disc|disk|cd|part) ?\d{1,2}', folder_name.lower()):
             files = [file.path for file in os.scandir(curr) if os.path.isfile(file)]
             if not has_media_files(files):
                 return False
@@ -110,6 +111,7 @@ def validate_folder_name(release: Release, violations: List[Violation], folder_n
         violations.append(Violation(ViolationType.FOLDER_NAME,
                                     "Invalid folder name '{folder_name}' should be '{valid_folder_name}'"
                                     .format(folder_name=folder_name, valid_folder_name=valid_folder_name)))
+
 
 def add_unreadable_files(violations: List[Violation], unreadable: List[str]):
     for file in unreadable:
@@ -384,7 +386,7 @@ def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr
             logging.getLogger(__name__).error("Release folder already exists: {0}".format(fixed_dir))
 
     release_tuple = UniqueRelease(release.validate_release_artists(), release.validate_release_date().split("-")[0],
-                    release.validate_release_title(), release.validate_codec())
+                                  release.validate_release_title(), release.validate_codec())
 
     # move the release folder to a destination
     if dest_folder and release.num_violations == 0:
@@ -411,7 +413,7 @@ def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr
             else:
                 if duplicate_folder:
                     release_folder_name = release.get_folder_name(codec_short=codec_short,
-                                                                      group_by_category=args.group_by_category)
+                                                                  group_by_category=args.group_by_category)
                     move_duplicate(duplicate_folder, moved_dir, release_folder_name)
 
                 else:
@@ -490,6 +492,7 @@ def main():
         elif args.mode == "fix":
             fix_releases(validator, release_dirs, args, dest_folder, invalid_folder, duplicate_folder)
 
+
 def get_lastfmcache_api_url() -> str:
     root_dir = os.path.dirname(os.path.abspath(__file__))
     ini_filename = "config.ini"
@@ -507,6 +510,7 @@ def get_lastfmcache_api_url() -> str:
         exit(1)
 
     return config['lastfmcache']['api_url']
+
 
 def load_config():
     root_dir = os.path.dirname(os.path.abspath(__file__))
