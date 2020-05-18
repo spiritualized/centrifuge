@@ -20,7 +20,7 @@ from functions import load_directory, rename_files, color, can_lock_path
 from metafix.Release import Release
 from metafix.ReleaseValidator import ReleaseValidator
 from metafix.Violation import Violation
-from metafix.constants import ReleaseCategory, ViolationType
+from metafix.constants import ReleaseCategory, ViolationType, ReleaseSource
 from metafix.functions import has_audio_extension, flatten_artists
 
 
@@ -38,7 +38,7 @@ class UniqueRelease:
             return False
 
         return self.artists == other.artists and self.year == other.year and self.title == other.title \
-            and self.codec == other.codec
+               and self.codec == other.codec
 
     def __hash__(self):
         return hash((tuple(self.artists), self.year, self.title, self.codec))
@@ -51,7 +51,6 @@ class UniqueRelease:
 
 
 def get_release_dirs(src_folder: str) -> List[str]:
-
     folders = []
 
     get_release_dirs_inner(src_folder, folders)
@@ -60,7 +59,6 @@ def get_release_dirs(src_folder: str) -> List[str]:
 
 
 def get_release_dirs_inner(folder: str, folders: List[str]) -> List[str]:
-
     files = []
     subdirs = []
 
@@ -92,7 +90,6 @@ def has_media_files(files: List[str]) -> bool:
 
 
 def subdirs_are_discs(subdirs: List[str]) -> bool:
-
     # sanity check
     if len(subdirs) > 20:
         return False
@@ -115,7 +112,7 @@ def validate_folder_name(release: Release, violations: List[Violation], folder_n
         violations.append(Violation(ViolationType.FOLDER_NAME, "Cannot validate folder name"))
         return
 
-    valid_folder_name = release.get_folder_name(group_by_category=group_by_category, codec_short=codec_short)
+    valid_folder_name = release.get_folder_name(codec_short=codec_short, group_by_category=group_by_category)
     if valid_folder_name != folder_name and not skip_comparison:
         violations.append(Violation(ViolationType.FOLDER_NAME,
                                     "Invalid folder name '{folder_name}' should be '{valid_folder_name}'"
@@ -195,7 +192,7 @@ def validate_releases(validator: ReleaseValidator, release_dirs: List[str], args
 
     for curr_dir in release_dirs:
         audio, non_audio, unreadable = load_directory(curr_dir)
-        release = Release(audio)
+        release = Release(audio, guess_category_from_path(curr_dir), guess_source_from_path(curr_dir))
 
         codec_short = not args.full_codec_names
         violations = validator.validate(release)
@@ -211,9 +208,9 @@ def validate_releases(validator: ReleaseValidator, release_dirs: List[str], args
 def guess_category_from_path(path: str) -> Optional[ReleaseCategory]:
     """Extract a release category from a path. Defaults to Album if none can be inferred"""
 
-    # check if up to 2 parent directories are an exact match of a category
+    # check if up to 3 parent directories are an exact match of a category
     parent_dirs = path.split(os.path.sep)
-    parent_dirs = parent_dirs[-3:-1] if len(parent_dirs) > 2 else parent_dirs
+    parent_dirs = parent_dirs[-4:-1] if len(parent_dirs) > 3 else parent_dirs
     parent_dirs.reverse()
 
     for category in ReleaseCategory:
@@ -237,6 +234,37 @@ def guess_category_from_path(path: str) -> Optional[ReleaseCategory]:
 
     # default to album
     return ReleaseCategory.ALBUM
+
+
+def guess_source_from_path(path: str) -> ReleaseSource:
+    """Extract a release source from a path. Defaults to CD if none can be inferred"""
+
+    # check if up to 3 parent directories are an exact match of a category
+    parent_dirs = path.split(os.path.sep)
+    parent_dirs = parent_dirs[-4:-1] if len(parent_dirs) > 3 else parent_dirs
+    parent_dirs.reverse()
+
+    for category in ReleaseSource:
+        for curr_dir in parent_dirs:
+            if curr_dir.lower() == category.value.lower():
+                return category
+
+    bracket_pairs = [["[", "]"], ["(", ")"], ["{", "}"]]
+    release_dir = str(os.path.split(path)[1]).lower()
+
+    # check if "[Source]" is contained in the release folder name
+    for category in ReleaseSource:
+        for brackets in bracket_pairs:
+            if "{0}{1}{2}".format(brackets[0], category.value.lower(), brackets[1]) in release_dir:
+                return category
+
+    # check if the release folder name ends with a space and a source name, without brackets
+    for category in [x for x in ReleaseSource]:
+        if release_dir.endswith(" {0}".format(category.value.lower())):
+            return category
+
+    return ReleaseSource.CD
+
 
 def assemble_discs(release_dirs: List[str], move_folders: bool) -> None:
     """
@@ -301,7 +329,7 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
 
         audio, non_audio, unreadable = load_directory(curr_dir)
 
-        release = Release(audio, guess_category_from_path(curr_dir))
+        release = Release(audio, guess_category_from_path(curr_dir), guess_source_from_path(curr_dir))
 
         fixed = validator.fix(release, os.path.split(curr_dir)[1])
 
@@ -444,7 +472,7 @@ def move_rename_folder(release: Release, unique_releases: Set[Tuple], curr_dir: 
             else:
                 # move the current one
                 release_folder_name = release.get_folder_name(codec_short=codec_short,
-                                                             group_by_category=args.group_by_category)
+                                                              group_by_category=args.group_by_category)
                 move_duplicate(duplicate_folder, moved_dir, release_folder_name)
 
         else:
@@ -466,7 +494,6 @@ def move_duplicate(duplicate_folder: str, source_folder: str, release_folder_nam
 
 
 def main():
-
     args = parse_args()
 
     src_folder = os.path.abspath(args.path)
@@ -505,7 +532,7 @@ def main():
 
     elif args.mode in ["validate", "fix"]:
         lastfm = LastfmCache(lastfmcache_api_url=get_lastfmcache_api_url())
-        lastfm.enable_file_cache(86400*365*5)
+        lastfm.enable_file_cache(86400 * 365 * 5)
 
         validator = ReleaseValidator(lastfm)
 
