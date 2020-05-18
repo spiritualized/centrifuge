@@ -1,3 +1,4 @@
+from __future__ import annotations
 import configparser
 import logging
 import os
@@ -24,21 +25,29 @@ from metafix.functions import has_audio_extension, flatten_artists
 
 
 class UniqueRelease:
-    def __init__(self, artists: List[str], year: str, title: str, codec: str):
+    def __init__(self, artists: List[str], year: str, title: str, codec: str, rank: int, path: str):
         self.artists = artists
         self.year = year
         self.title = title
         self.codec = codec
+        self.rank = rank
+        self.path = path
 
     def __eq__(self, other):
         if not isinstance(other, UniqueRelease):
             return False
 
         return self.artists == other.artists and self.year == other.year and self.title == other.title \
-               and self.codec == other.codec
+            and self.codec == other.codec
 
     def __hash__(self):
         return hash((tuple(self.artists), self.year, self.title, self.codec))
+
+    def __lt__(self, other: UniqueRelease) -> bool:
+        return self.rank < other.rank
+
+    def __gt__(self, other: UniqueRelease) -> bool:
+        return self.rank > other.rank
 
 
 def get_release_dirs(src_folder: str) -> List[str]:
@@ -283,7 +292,7 @@ def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: arg
 
     assemble_discs(release_dirs, True)
 
-    unique_releases = {}
+    unique_releases = set()
 
     for curr_dir in release_dirs:
         if not can_lock_path(curr_dir):
@@ -356,7 +365,7 @@ def move_invalid_folder(curr_dir: str, invalid_folder: str, violations: List[Vio
     return relocated_dir
 
 
-def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr_dir: str, dest_folder: str,
+def move_rename_folder(release: Release, unique_releases: Set[Tuple], curr_dir: str, dest_folder: str,
                        duplicate_folder: str, args: argparse.Namespace) -> str:
     """Rename a release folder, and move to a destination folder"""
 
@@ -385,10 +394,8 @@ def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr
         else:
             logging.getLogger(__name__).error("Release folder already exists: {0}".format(fixed_dir))
 
-    release_tuple = UniqueRelease(release.validate_release_artists(), release.validate_release_date().split("-")[0],
-                                  release.validate_release_title(), release.validate_codec())
-
     # move the release folder to a destination
+    moved_duplicate = False
     if dest_folder and release.num_violations == 0:
         artist_folder = flatten_artists(release.validate_release_artists()) \
             if args.group_by_artist and not release.is_va() else ""
@@ -414,23 +421,39 @@ def move_rename_folder(release: Release, unique_releases: Dict[Tuple, str], curr
                 if duplicate_folder:
                     release_folder_name = release.get_folder_name(codec_short=codec_short,
                                                                   group_by_category=args.group_by_category)
-                    move_duplicate(duplicate_folder, moved_dir, release_folder_name)
+                    moved_dir = move_duplicate(duplicate_folder, moved_dir, release_folder_name)
+                    moved_duplicate = True
 
                 else:
                     logging.getLogger(__name__).error("Destination folder already exists: {0}".format(fixed_dir))
 
     # deduplicate versions of the same release
-    if duplicate_folder and release.num_violations == 0:
-        if release_tuple in unique_releases:
-            existing = unique_releases[release_tuple][0]
+    unique_release = UniqueRelease(release.validate_release_artists(), release.validate_release_date().split("-")[0],
+                                   release.validate_release_title(), release.validate_codec(), release.get_codec_rank(),
+                                   moved_dir)
+
+    if duplicate_folder and release.num_violations == 0 and not moved_duplicate:
+        if unique_release in unique_releases:
+            existing = [x for x in unique_releases if x == unique_release][0]
+            if unique_release > existing:
+                # move the existing one
+                release_folder_name = os.path.split(existing.path)[1]
+                move_duplicate(duplicate_folder, existing.path, release_folder_name)
+                unique_releases.remove(unique_release)
+                unique_releases.add(unique_release)
+            else:
+                # move the current one
+                release_folder_name = release.get_folder_name(codec_short=codec_short,
+                                                             group_by_category=args.group_by_category)
+                move_duplicate(duplicate_folder, moved_dir, release_folder_name)
 
         else:
-            unique_releases[release_tuple] = (release.get_release_codec_setting(), moved_dir)
+            unique_releases.add(unique_release)
 
     return moved_dir
 
 
-def move_duplicate(duplicate_folder: str, source_folder: str, release_folder_name: str):
+def move_duplicate(duplicate_folder: str, source_folder: str, release_folder_name: str) -> str:
     attempt = 0
     while True:
         curr_dest_folder = os.path.join(duplicate_folder, release_folder_name)
@@ -438,7 +461,7 @@ def move_duplicate(duplicate_folder: str, source_folder: str, release_folder_nam
             curr_dest_folder += "_{0}".format(attempt)
         if not os.path.exists(curr_dest_folder):
             os.rename(source_folder, curr_dest_folder)
-            break
+            return curr_dest_folder
         attempt += 1
 
 
