@@ -105,3 +105,4 @@ config.ini
 cache.db
 cleartag
 metafix
+lastfmcache
