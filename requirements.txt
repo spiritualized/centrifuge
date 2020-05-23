@@ -1,7 +1,7 @@
 bitstring==3.1.6
-cleartag>=1.0.0
+cleartag>=1.1.0
 colored==1.4.2
-lastfmcache>=1.1.0
-metafix>=1.0.2
+lastfmcache>=1.2.3
+metafix>=1.1.0
 mutagen==1.44.0
 ordered-set==3.1.1
