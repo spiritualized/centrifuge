@@ -542,9 +542,16 @@ def main():
         elif args.mode == "fix":
             fix_releases(validator, release_dirs, args, dest_folder, invalid_folder, duplicate_folder)
 
+def get_root_dir() -> str:
+    """get the root directory"""
+    if getattr(sys, 'frozen', False):
+        return sys._MEIPASS
+
+    return os.path.dirname(os.path.abspath(__file__))
+
 
 def get_lastfmcache_api_url() -> str:
-    root_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = get_root_dir()
     ini_filename = "config.ini"
 
     if not os.path.isfile(os.path.join(root_dir, ini_filename)):
@@ -563,7 +570,7 @@ def get_lastfmcache_api_url() -> str:
 
 
 def load_config():
-    root_dir = os.path.dirname(os.path.abspath(__file__))
+    root_dir = get_root_dir()
     ini_filename = "config.ini"
 
     if not os.path.isfile(os.path.join(root_dir, ini_filename)):

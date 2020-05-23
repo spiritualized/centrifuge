@@ -8,8 +8,7 @@ pip install -r requirements.txt
 pip install pyinstaller
 echo Environment setup complete.
 
-pyinstaller --additional-hooks-dir "hooks" %* -F centrifuge.py
-cp  ini_template dist/ini_template
+pyinstaller --add-data "ini_template;." --additional-hooks-dir "hooks" %* centrifuge.py
 echo Build complete.
 deactivate
 
