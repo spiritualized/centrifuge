@@ -9,19 +9,19 @@ import sys
 import argparse
 import time
 from collections import OrderedDict
-from typing import List, Optional, Set, Dict, Tuple, Iterator
+from typing import List, Optional, Set, Tuple, Iterator
 
 import colored
 
 from lastfmcache import LastfmCache
 
 import cleartag
-from functions import load_directory, rename_files, color, can_lock_path
+from functions import load_directory, rename_files, color, can_lock_path, get_release_dirs
 from metafix.Release import Release
 from metafix.ReleaseValidator import ReleaseValidator
 from metafix.Violation import Violation
 from metafix.constants import ReleaseCategory, ViolationType, ReleaseSource
-from metafix.functions import has_audio_extension, flatten_artists
+from metafix.functions import flatten_artists
 
 
 class UniqueRelease:
@@ -48,52 +48,6 @@ class UniqueRelease:
 
     def __gt__(self, other: UniqueRelease) -> bool:
         return self.rank > other.rank
-
-
-def get_release_dirs(folder: str) -> List[str]:
-    files = []
-    subdirs = []
-
-    for curr in os.scandir(folder):
-        if curr.is_file():
-            files.append(curr.path)
-        elif curr.is_dir():
-            subdirs.append(curr.path)
-
-    # no subfolders, media files present
-    if (not subdirs and has_media_files(files)) or (subdirs and subdirs_are_discs(subdirs)):
-        yield folder
-
-    else:
-        for subdir in subdirs:
-            yield from get_release_dirs(subdir)
-
-
-def has_media_files(files: List[str]) -> bool:
-    result = False
-
-    for file in files:
-        if has_audio_extension(file):
-            result = True
-
-    return result
-
-
-def subdirs_are_discs(subdirs: List[str]) -> bool:
-    # sanity check
-    if len(subdirs) > 20:
-        return False
-
-    for curr in subdirs:
-        folder_name = curr.split(os.path.sep)[-1]
-        if re.findall(r'(disc|disk|cd|part) ?\d{1,2}', folder_name.lower()):
-            files = [file.path for file in os.scandir(curr) if os.path.isfile(file)]
-            if not has_media_files(files):
-                return False
-        else:
-            return False
-
-    return True
 
 
 def validate_folder_name(release: Release, violations: List[Violation], folder_name: str, skip_comparison: bool,

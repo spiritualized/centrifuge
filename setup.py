@@ -1,10 +1,11 @@
 from distutils.core import setup
 setup(
     name='centrifuge-manager',
-    scripts=['centrifuge.py'],
+    scripts=['centrifuge', 'centrifuge.bat'],
+    packages=['.'],
     version='1.0.0',
-    description="""Music release management application, which provides validation, repair, and standardization. 
-    Useful for managing large libraries.""",
+    description="""Music release management application, which provides metadata validation, repair, and 
+    standardization. Useful for managing large libraries.""",
     url='https://github.com/spiritualized/centrifuge',
     download_url='https://github.com/spiritualized/centrifuge/archive/v1.0.0.tar.gz',
     keywords=['audio', 'library', 'management', 'metadata', 'validation', 'mp3', 'flac', 'python'],
