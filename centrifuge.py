@@ -9,7 +9,7 @@ import sys
 import argparse
 import time
 from collections import OrderedDict
-from typing import List, Optional, Set, Dict, Tuple
+from typing import List, Optional, Set, Dict, Tuple, Iterator
 
 import colored
 
@@ -50,15 +50,7 @@ class UniqueRelease:
         return self.rank > other.rank
 
 
-def get_release_dirs(src_folder: str) -> List[str]:
-    folders = []
-
-    get_release_dirs_inner(src_folder, folders)
-
-    return folders
-
-
-def get_release_dirs_inner(folder: str, folders: List[str]) -> List[str]:
+def get_release_dirs(folder: str) -> List[str]:
     files = []
     subdirs = []
 
@@ -70,13 +62,11 @@ def get_release_dirs_inner(folder: str, folders: List[str]) -> List[str]:
 
     # no subfolders, media files present
     if (not subdirs and has_media_files(files)) or (subdirs and subdirs_are_discs(subdirs)):
-        folders.append(folder)
+        yield folder
 
     else:
         for subdir in subdirs:
-            get_release_dirs_inner(subdir, folders)
-
-    return folders
+            yield from get_release_dirs(subdir)
 
 
 def has_media_files(files: List[str]) -> bool:
@@ -161,9 +151,11 @@ def list_releases(release_dirs: List[str]) -> None:
     """List releases found in the scan directory"""
 
     print("Found release directories:")
+    num = 0
     for curr in release_dirs:
         print(curr)
-    print("Total: {0}".format(len(release_dirs)))
+        num += 1
+    print("Total: {0}".format(num))
 
 
 def format_violations_str(old_violations: List[Violation], fixed_violations: Optional[List[Violation]] = None) -> str:
@@ -266,7 +258,7 @@ def guess_source_from_path(path: str) -> ReleaseSource:
     return ReleaseSource.CD
 
 
-def assemble_discs(release_dirs: List[str], move_folders: bool) -> None:
+def assemble_discs(release_dirs: Iterator[str], move_folders: bool) -> None:
     """
     Directories which contain non-nested discs belonging to the same release are problematic. Solve this by grouping
     disc directories via their lowercase prefix, and move them inside a created release directory
@@ -294,31 +286,21 @@ def assemble_discs(release_dirs: List[str], move_folders: bool) -> None:
     # unpack
     consolidate = {item[0]: item[1] for item in consolidate.values()}
 
-    # in validate mode, remove the matched folders, thus eliminating them from consideration
-    if not move_folders:
-        for release_path in consolidate:
-            for disc in consolidate[release_path]:
-                release_dirs.remove(os.path.join(os.path.split(release_path)[0], disc))
-
     # in fix mode, create a parent folder and consolidate
-    else:
+    if move_folders:
         for release_path in consolidate:
-            # create a container directory, add it to release_dirs
+            # create a container directory
             os.makedirs(release_path, exist_ok=True)
-            release_dirs.append(release_path)
 
-            # move each disc into the container, and remove from release_dirs
+            # move each disc into the container
             for disc in consolidate[release_path]:
                 source = os.path.join(os.path.split(release_path)[0], disc)
                 os.rename(source, os.path.join(release_path, disc))
-                release_dirs.remove(source)
 
 
-def fix_releases(validator: ReleaseValidator, release_dirs: List[str], args: argparse.Namespace,
+def fix_releases(validator: ReleaseValidator, release_dirs: Iterator[str], args: argparse.Namespace,
                  dest_folder: str, invalid_folder: str, duplicate_folder: str) -> None:
     """Fix releases found in the scan directory"""
-
-    assemble_discs(release_dirs, True)
 
     unique_releases = set()
 
@@ -525,10 +507,8 @@ def main():
         if not os.path.isdir(duplicate_folder):
             raise ValueError("Invalid duplicates folder: {0}".format(duplicate_folder))
 
-    release_dirs = get_release_dirs(src_folder)
-
     if args.mode == "releases":
-        list_releases(release_dirs)
+        list_releases(get_release_dirs(src_folder))
 
     elif args.mode in ["validate", "fix"]:
         lastfm = LastfmCache(lastfmcache_api_url=get_lastfmcache_api_url())
@@ -537,10 +517,11 @@ def main():
         validator = ReleaseValidator(lastfm)
 
         if args.mode == "validate":
-            validate_releases(validator, release_dirs, args)
+            validate_releases(validator, get_release_dirs(src_folder), args)
 
         elif args.mode == "fix":
-            fix_releases(validator, release_dirs, args, dest_folder, invalid_folder, duplicate_folder)
+            assemble_discs(get_release_dirs(src_folder), True)
+            fix_releases(validator, get_release_dirs(src_folder), args, dest_folder, invalid_folder, duplicate_folder)
 
 def get_root_dir() -> str:
     """get the root directory"""
