@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import time
 from collections import OrderedDict
 from typing import List
@@ -12,6 +13,51 @@ from exceptions import InvalidPathError
 from metafix.Release import Release
 from metafix.Track import Track
 from metafix.functions import has_audio_extension
+
+def get_release_dirs(folder: str) -> List[str]:
+    files = []
+    subdirs = []
+
+    for curr in os.scandir(folder):
+        if curr.is_file():
+            files.append(curr.path)
+        elif curr.is_dir():
+            subdirs.append(curr.path)
+
+    # no subfolders, media files present
+    if (not subdirs and has_media_files(files)) or (subdirs and subdirs_are_discs(subdirs)):
+        yield folder
+
+    else:
+        for subdir in subdirs:
+            yield from get_release_dirs(subdir)
+
+
+def has_media_files(files: List[str]) -> bool:
+    result = False
+
+    for file in files:
+        if has_audio_extension(file):
+            result = True
+
+    return result
+
+
+def subdirs_are_discs(subdirs: List[str]) -> bool:
+    # sanity check
+    if len(subdirs) > 20:
+        return False
+
+    for curr in subdirs:
+        folder_name = curr.split(os.path.sep)[-1]
+        if re.findall(r'(disc|disk|cd|part) ?\d{1,2}', folder_name.lower()):
+            files = [file.path for file in os.scandir(curr) if os.path.isfile(file)]
+            if not has_media_files(files):
+                return False
+        else:
+            return False
+
+    return True
 
 
 def load_directory(path_param: str):
@@ -114,5 +160,5 @@ def can_lock_path(path: str) -> bool:
     return True
 
 
-def color(str_in: str, color: str) -> str:
-    return "{0}{1}{2}".format(color, str_in, colored.attr('reset'))
+def color(str_in: str, color_in: str) -> str:
+    return "{0}{1}{2}".format(color_in, str_in, colored.attr('reset'))
