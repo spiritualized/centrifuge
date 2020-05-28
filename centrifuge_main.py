@@ -252,6 +252,18 @@ def assemble_discs(release_dirs: Iterator[str], move_folders: bool) -> None:
                 os.rename(source, os.path.join(release_path, disc))
 
 
+def enforce_max_path(path: str) -> None:
+    for curr in os.scandir(path):
+        curr_full_path = os.path.join(path, curr)
+        if len(curr_full_path) > 255:
+            if len(os.path.split(curr_full_path)[0]) >= 245:
+                raise ValueError("Path is too long: {0}".format(os.path.split(curr_full_path)[0]))
+            curr_prefix, curr_ext = os.path.splitext(curr_full_path)
+            new_full_path = curr_prefix[:255-len(curr_ext)-2] + ".." + curr_ext
+            if not os.path.exists(new_full_path):
+                os.rename(curr_full_path, new_full_path)
+
+
 def fix_releases(validator: ReleaseValidator, release_dirs: Iterator[str], args: argparse.Namespace,
                  dest_folder: str, invalid_folder: str, duplicate_folder: str) -> None:
     """Fix releases found in the scan directory"""
@@ -301,6 +313,8 @@ def fix_releases(validator: ReleaseValidator, release_dirs: Iterator[str], args:
             moved_dir = move_rename_folder(fixed, unique_releases, curr_dir, dest_folder, duplicate_folder, args)
         else:
             moved_dir = move_invalid_folder(curr_dir, invalid_folder, violations, args.move_invalid)
+
+        enforce_max_path(moved_dir)
 
         print("{0} violations: {1}".format(format_violations_str(old_violations, violations), moved_dir))
 
