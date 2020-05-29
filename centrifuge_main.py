@@ -443,6 +443,20 @@ def move_duplicate(duplicate_folder: str, source_folder: str, release_folder_nam
         attempt += 1
 
 
+def guess_group_by_category(src_folder: str, dest_folder: str) -> bool:
+    """Guess if group_by_catetory is desirable"""
+    scan_folder = dest_folder if dest_folder else src_folder
+
+    if os.path.split(scan_folder)[1] in {item.value for item in ReleaseCategory}:
+        return True
+
+    for curr in os.scandir(scan_folder):
+        if curr.name not in {item.value for item in ReleaseCategory}:
+            return False
+
+    return True
+
+
 def main():
     args = parse_args()
 
@@ -475,6 +489,10 @@ def main():
         if not os.path.isdir(duplicate_folder):
             raise ValueError("Invalid duplicates folder: {0}".format(duplicate_folder))
 
+    # guess group_by_category, if it was not set, using the contents of the destination folder
+    if not args.group_by_category:
+        args.group_by_category = guess_group_by_category(src_folder, dest_folder)
+
     if args.mode == "releases":
         list_releases(get_release_dirs(src_folder))
 
@@ -492,7 +510,7 @@ def main():
             fix_releases(validator, get_release_dirs(src_folder), args, dest_folder, invalid_folder, duplicate_folder)
 
 def get_root_dir() -> str:
-    """get the root directory"""
+    """get the root directory of the script"""
     if getattr(sys, 'frozen', False):
         return sys._MEIPASS
 
