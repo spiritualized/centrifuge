@@ -90,6 +90,7 @@ def parse_args() -> argparse.Namespace:
     argparser.add_argument("--move-invalid-to", help="destination directory for releases which fail validation")
 
     argparser.add_argument("--move-duplicate-to", help="destination directory for valid releases which already exist")
+    argparser.add_argument('--expunge-comments-with-substring', help="remove comments which contain a substring")
 
     return argparser.parse_args()
 
@@ -283,7 +284,7 @@ def fix_releases(validator: ReleaseValidator, release_dirs: Iterator[str], args:
 
         if not args.dry_run:
             for x in fixed.tracks:
-                if fixed.tracks[x] != release.tracks[x]:
+                if fixed.tracks[x] != release.tracks[x] or fixed.tracks[x].always_write:
                     cleartag.write_tags(os.path.join(curr_dir, x), fixed.tracks[x])
 
         # rename files
@@ -501,6 +502,9 @@ def main():
         lastfm.enable_file_cache(86400 * 365 * 5)
 
         validator = ReleaseValidator(lastfm)
+
+        if args.expunge_comments_with_substring:
+            validator.add_forbidden_comment_substring(args.expunge_comments_with_substring)
 
         if args.mode == "validate":
             validate_releases(validator, get_release_dirs(src_folder), args)
