@@ -226,6 +226,10 @@ def assemble_discs(release_dirs: Iterator[str], move_folders: bool) -> None:
         match = re.findall(r'(?i)( )?([(\[{ ])?(disc|disk|cd|part)( ?)(\d{1,2})([)\]}])?', folder)
 
         if match:
+            # skip if the character preceding the disc variant is an alphanumeric character
+            if folder.find(match[0][2]) > 0 and folder[folder.find(match[0][2]) - 1].isalnum():
+                continue
+
             container = os.path.join(parent, folder.replace(''.join(match[0]), ""))
             container = re.sub(r' \[[\w]+\]', '', container)
 
@@ -390,6 +394,7 @@ def move_rename_folder(release: Release, unique_releases: Set[Tuple], curr_dir: 
                 os.makedirs(curr_dest_parent_folder, exist_ok=True)
             if not os.path.exists(curr_dest_folder):
                 os.rename(moved_dir, curr_dest_folder)
+                moved_dir = curr_dest_folder
 
                 # clean up empty directories
                 curr_src_parent_folder = os.path.split(fixed_dir)[0]
@@ -417,14 +422,14 @@ def move_rename_folder(release: Release, unique_releases: Set[Tuple], curr_dir: 
             if unique_release > existing:
                 # move the existing one
                 release_folder_name = os.path.split(existing.path)[1]
-                move_duplicate(duplicate_folder, existing.path, release_folder_name)
+                moved_dir = move_duplicate(duplicate_folder, existing.path, release_folder_name)
                 unique_releases.remove(unique_release)
                 unique_releases.add(unique_release)
             else:
                 # move the current one
                 release_folder_name = release.get_folder_name(codec_short=codec_short,
                                                               group_by_category=args.group_by_category)
-                move_duplicate(duplicate_folder, moved_dir, release_folder_name)
+                moved_dir = move_duplicate(duplicate_folder, moved_dir, release_folder_name)
 
         else:
             unique_releases.add(unique_release)
