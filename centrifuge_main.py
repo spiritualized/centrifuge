@@ -191,24 +191,24 @@ def guess_source_from_path(path: str) -> ReleaseSource:
     parent_dirs = parent_dirs[-4:-1] if len(parent_dirs) > 3 else parent_dirs
     parent_dirs.reverse()
 
-    for category in ReleaseSource:
+    for source in ReleaseSource:
         for curr_dir in parent_dirs:
-            if curr_dir.lower() == category.value.lower():
-                return category
+            if curr_dir.lower() == source.value.lower():
+                return source
 
     bracket_pairs = [["[", "]"], ["(", ")"], ["{", "}"]]
     release_dir = str(os.path.split(path)[1]).lower()
 
     # check if "[Source]" is contained in the release folder name
-    for category in ReleaseSource:
+    for source in ReleaseSource:
         for brackets in bracket_pairs:
-            if "{0}{1}{2}".format(brackets[0], category.value.lower(), brackets[1]) in release_dir:
-                return category
+            if "{0}{1}{2}".format(brackets[0], source.value.lower(), brackets[1]) in release_dir:
+                return source
 
     # check if the release folder name ends with a space and a source name, without brackets
-    for category in [x for x in ReleaseSource]:
-        if release_dir.endswith(" {0}".format(category.value.lower())):
-            return category
+    for source in [x for x in ReleaseSource]:
+        if release_dir.endswith(" {0}".format(source.value.lower())):
+            return source
 
     return ReleaseSource.CD
 
