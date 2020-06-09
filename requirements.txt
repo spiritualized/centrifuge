@@ -5,3 +5,4 @@ lastfmcache>=1.2.3
 metafix>=1.1.0
 mutagen==1.44.0
 ordered-set==3.1.1
+release-dir-scanner>=1.0.0
