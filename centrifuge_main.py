@@ -16,12 +16,13 @@ import colored
 from lastfmcache import LastfmCache
 
 import cleartag
-from functions import load_directory, rename_files, color, can_lock_path, get_release_dirs
+from functions import load_directory, rename_files, color, can_lock_path
 from metafix.Release import Release
 from metafix.ReleaseValidator import ReleaseValidator
 from metafix.Violation import Violation
 from metafix.constants import ReleaseCategory, ViolationType, ReleaseSource
 from metafix.functions import flatten_artists
+from release_dir_scanner import get_release_dirs
 
 
 class UniqueRelease:

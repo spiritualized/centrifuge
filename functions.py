@@ -12,74 +12,7 @@ from cleartag.Exceptions import ClearTagError
 from exceptions import InvalidPathError
 from metafix.Release import Release
 from metafix.Track import Track
-from metafix.functions import has_audio_extension
-
-def get_release_dirs(folder: str) -> List[str]:
-    files = []
-    subdirs = []
-
-    for curr in os.scandir(folder):
-        if curr.is_file():
-            files.append(curr.path)
-        elif curr.is_dir():
-            subdirs.append(curr.path)
-
-    # no subfolders, media files present
-    if (not subdirs and has_media_files(files)) or (subdirs and subdirs_are_discs(subdirs)):
-        yield folder
-
-    else:
-        for subdir in subdirs:
-            yield from get_release_dirs(subdir)
-
-
-def has_media_files(files: List[str]) -> bool:
-    result = False
-
-    for file in files:
-        if has_audio_extension(file):
-            result = True
-
-    return result
-
-def get_dir_size(dir: str) -> int:
-    return sum(os.path.getsize(os.path.join(dirpath,filename)) for dirpath, dirnames, filenames in os.walk(dir)
-                for filename in filenames)
-
-
-def subdirs_are_discs(subdirs: List[str]) -> bool:
-    # sanity check
-    if len(subdirs) > 20:
-        return False
-
-    curr_disc = []
-    curr_not_disc = []
-
-    for curr in subdirs:
-        folder_name = curr.split(os.path.sep)[-1]
-        if re.findall(r'(disc|disk|cd|part) ?\d{1,2}', folder_name.lower()) or "bonus" in folder_name.lower():
-            files = [file.path for file in os.scandir(curr) if os.path.isfile(file)]
-            if has_media_files(files):
-                curr_disc.append(curr)
-            else:
-                curr_not_disc.append(curr)
-        else:
-            curr_not_disc.append(curr)
-
-        # there cannot be more than 10 non-disc entries in the directory
-        if len(curr_not_disc) > 5:
-            return False
-
-    # at least 2 subdirs need to be discs
-    if len(curr_disc) < 2:
-        return False
-
-    # if any of the subfolders are more than 50MB, return False
-    for curr in curr_not_disc:
-        if get_dir_size(curr) > 100*1024*1024:
-            return False
-
-    return True
+from release_dir_scanner import has_audio_extension
 
 
 def load_directory(path_param: str):
