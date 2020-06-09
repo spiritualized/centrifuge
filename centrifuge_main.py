@@ -177,7 +177,8 @@ def guess_category_from_path(path: str) -> Optional[ReleaseCategory]:
 
     # check if the release folder name ends with a space and a category name, without brackets (except Album)
     for category in [x for x in ReleaseCategory if x is not ReleaseCategory.ALBUM]:
-        if release_dir.endswith(" {0}".format(category.value.lower())):
+        if release_dir.lower().endswith(" {0}".format(category.value.lower())) \
+                or " {0} ".format(category.value.lower()) in release_dir.lower():
             return category
 
     # default to album
@@ -208,7 +209,8 @@ def guess_source_from_path(path: str) -> ReleaseSource:
 
     # check if the release folder name ends with a space and a source name, without brackets
     for source in [x for x in ReleaseSource]:
-        if release_dir.endswith(" {0}".format(source.value.lower())):
+        if release_dir.lower().endswith(" {0}".format(source.value.lower())) \
+                or " {0} ".format(source.value.lower()) in release_dir.lower():
             return source
 
     return ReleaseSource.CD
