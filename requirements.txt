@@ -1,8 +1,8 @@
 bitstring==3.1.6
-cleartag>=1.1.0
+cleartag>=1.2.1
 colored==1.4.2
-lastfmcache>=1.2.3
-metafix>=1.1.0
+lastfmcache>=1.2.4
+metafix>=1.3.2
 mutagen==1.44.0
 ordered-set==3.1.1
-release-dir-scanner>=1.0.0
+release-dir-scanner>=1.0.1

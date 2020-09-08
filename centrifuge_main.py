@@ -136,7 +136,7 @@ def format_violations_str(old_violations: List[Violation], fixed_violations: Opt
 def validate_releases(validator: ReleaseValidator, release_dirs: List[str], args: argparse.Namespace) -> None:
     """Validate releases found in the scan directory"""
 
-    assemble_discs(release_dirs, False)
+    # assemble_discs(release_dirs, False)
 
     for curr_dir in release_dirs:
         audio, non_audio, unreadable = load_directory(curr_dir)
@@ -181,6 +181,11 @@ def guess_category_from_path(path: str) -> Optional[ReleaseCategory]:
                 or " {0} ".format(category.value.lower()) in release_dir.lower():
             return category
 
+    # check if the category is in the middle of the release folder name, surrounded by certain characters
+    for category in [x for x in ReleaseCategory if x is not ReleaseCategory.ALBUM]:
+        if re.search("(?i)[-_\[{( ]" + category.value + "[-_\]}) $]", release_dir):
+            return category
+
     # default to album
     return ReleaseCategory.ALBUM
 
@@ -202,15 +207,20 @@ def guess_source_from_path(path: str) -> ReleaseSource:
     release_dir = str(os.path.split(path)[1]).lower()
 
     # check if "[Source]" is contained in the release folder name
-    for source in ReleaseSource:
+    for source in [x for x in ReleaseSource if x != ReleaseSource.UNKNOWN]:
         for brackets in bracket_pairs:
             if "{0}{1}{2}".format(brackets[0], source.value.lower(), brackets[1]) in release_dir:
                 return source
 
     # check if the release folder name ends with a space and a source name, without brackets
-    for source in [x for x in ReleaseSource]:
+    for source in [x for x in ReleaseSource if x != ReleaseSource.UNKNOWN]:
         if release_dir.lower().endswith(" {0}".format(source.value.lower())) \
                 or " {0} ".format(source.value.lower()) in release_dir.lower():
+            return source
+
+    # check if the source is in the middle of the release folder name, surrounded by certain characters
+    for source in [x for x in ReleaseSource if x not in [ReleaseSource.CD, ReleaseSource.UNKNOWN]]:
+        if re.search("(?i)[-_\[{( ]" + source.value + "[-_\]}) $]", release_dir):
             return source
 
     return ReleaseSource.CD
