@@ -520,6 +520,8 @@ def main():
         lastfm.enable_file_cache(86400 * 365 * 5)
 
         validator = ReleaseValidator(lastfm)
+        validator.disable_lastfm_track_title_validation()
+
 
         if args.expunge_comments_with_substring:
             validator.add_forbidden_comment_substring(args.expunge_comments_with_substring)
