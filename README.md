@@ -68,7 +68,7 @@ Validate only: `centrifuge validate`
 Group by release category and by artist: `centrifuge fix "C:\Music" --group-by-artist --group-by-category`
 
 Move duplicates to a separate directory: 
-`centrifuge fix "C:\Unsorted music" --group-by-category`
+`centrifuge fix "C:\Unsorted music" --group-by-category --move-duplicate-to "C:\duplicate music"`
 
 Move releases which fail a specific validation to a separate directory. This mode is useful when applying specific 
 external fixes to a large set of invalid releases: `centrifuge fix "C:\Unsorted music"  --group-by-category --move-invalid codecs-inconsistent --move-invalid-to C:\broken`
